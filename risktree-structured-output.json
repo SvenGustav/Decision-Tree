@@ -1,0 +1,89 @@
+{
+  "type": "object",
+  "required": ["message", "action_type"],
+  "properties": {
+    "message": {
+      "type": "string",
+      "description": "Plain text response to the user. No asterisks, no markdown."
+    },
+    "action_type": {
+      "type": "string",
+      "enum": ["none", "build_tree", "update_tree"],
+      "description": "Which tree action to perform, or 'none' if no change needed."
+    },
+    "tree": {
+      "type": "object",
+      "description": "Root node. Required when action_type is 'build_tree'.",
+      "required": ["label", "kind"],
+      "properties": {
+        "label": { "type": "string" },
+        "kind": { "type": "string", "enum": ["decision", "chance", "terminal"] },
+        "payoff": { "type": "number" },
+        "edgeLabel": { "type": "string" },
+        "edgeProbability": { "type": "number" },
+        "edgePayoff": { "type": "number" },
+        "children": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label", "kind"],
+            "properties": {
+              "label": { "type": "string" },
+              "kind": { "type": "string", "enum": ["decision", "chance", "terminal"] },
+              "payoff": { "type": "number" },
+              "edgeLabel": { "type": "string" },
+              "edgeProbability": { "type": "number" },
+              "edgePayoff": { "type": "number" },
+              "children": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["label", "kind"],
+                  "properties": {
+                    "label": { "type": "string" },
+                    "kind": { "type": "string", "enum": ["decision", "chance", "terminal"] },
+                    "payoff": { "type": "number" },
+                    "edgeLabel": { "type": "string" },
+                    "edgeProbability": { "type": "number" },
+                    "edgePayoff": { "type": "number" },
+                    "children": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["label", "kind"],
+                        "properties": {
+                          "label": { "type": "string" },
+                          "kind": { "type": "string", "enum": ["decision", "chance", "terminal"] },
+                          "payoff": { "type": "number" },
+                          "edgeLabel": { "type": "string" },
+                          "edgeProbability": { "type": "number" },
+                          "edgePayoff": { "type": "number" },
+                          "children": { "type": "array", "items": { "type": "object" } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "changes": {
+      "type": "array",
+      "description": "Value changes for update_tree. Required when action_type is 'update_tree'.",
+      "items": {
+        "type": "object",
+        "required": ["type", "id"],
+        "properties": {
+          "type": { "type": "string", "enum": ["updateEdge", "updateNode"] },
+          "id": { "type": "string" },
+          "probability": { "type": "number" },
+          "payoff": { "type": "number" },
+          "label": { "type": "string" }
+        }
+      }
+    }
+  }
+}
