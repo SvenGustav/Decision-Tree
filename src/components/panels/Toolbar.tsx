@@ -14,17 +14,7 @@ import {
 } from 'lucide-react'
 import { useTreeStore } from '../../store/treeStore'
 import { exportTree, importTree } from '../../utils/io'
-
-// Toolbar color tokens
-const TB = {
-  bg: '#0f172a',
-  border: '#1e293b',
-  divider: '#334155',
-  textMuted: '#64748b',
-  textLabel: '#94a3b8',
-  btnBorder: '#334155',
-  btnHover: '#1e293b',
-}
+import { toolbarTheme, palette } from '../../theme'
 
 export function Toolbar() {
   const { addNode, nodes, edges, loadSnapshot, clearTree, runEMV, setAnalysisOpen, aiPanelOpen, setAiPanelOpen } = useTreeStore()
@@ -58,11 +48,12 @@ export function Toolbar() {
         display: 'flex',
         alignItems: 'center',
         gap: 4,
-        padding: '0 12px',
-        height: 48,
-        background: TB.bg,
-        borderBottom: `1px solid ${TB.border}`,
+        padding: '0 14px',
+        height: 52,
+        background: toolbarTheme.bg,
+        borderBottom: `1px solid ${toolbarTheme.border}`,
         flexShrink: 0,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
       }}
     >
       {/* App title */}
@@ -70,16 +61,40 @@ export function Toolbar() {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
-          marginRight: 12,
-          color: '#f8fafc',
-          fontWeight: 700,
-          fontSize: 15,
-          letterSpacing: '-0.3px',
+          gap: 10,
+          marginRight: 16,
+          padding: '6px 12px',
+          borderRadius: 8,
         }}
       >
-        <GitBranch size={16} color="#60a5fa" style={{ flexShrink: 0 }} />
-        RiskTree
+        <div style={{
+          width: 28,
+          height: 28,
+          background: '#1d4ed8',
+          borderRadius: 6,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <GitBranch size={16} color="white" />
+        </div>
+        <div>
+          <div style={{
+            color: toolbarTheme.text,
+            fontWeight: 700,
+            fontSize: 14,
+            letterSpacing: '-0.3px',
+          }}>
+            RiskTree
+          </div>
+          <div style={{
+            color: toolbarTheme.textMuted,
+            fontSize: 10,
+            fontWeight: 500,
+          }}>
+            Decision Analysis
+          </div>
+        </div>
       </div>
 
       <Divider />
@@ -87,26 +102,26 @@ export function Toolbar() {
       {/* Add nodes group */}
       <GroupLabel label="Add" />
       <NodeBtn
-        icon={<Square size={13} />}
+        icon={<Square size={14} />}
         label="Decision"
-        accent="#3b82f6"
-        accentBg="rgba(59,130,246,0.12)"
+        accent={toolbarTheme.accent.decision}
+        accentBg="#eff6ff"
         onClick={() => addNode('decision')}
         title="Add Decision node — square (highest-EMV branch chosen)"
       />
       <NodeBtn
-        icon={<Circle size={13} />}
+        icon={<Circle size={14} />}
         label="Chance"
-        accent="#22c55e"
-        accentBg="rgba(34,197,94,0.12)"
+        accent={toolbarTheme.accent.chance}
+        accentBg="#ecfdf5"
         onClick={() => addNode('chance')}
         title="Add Chance node — circle (probabilities must sum to 100%)"
       />
       <NodeBtn
-        icon={<Hexagon size={13} />}
+        icon={<Hexagon size={14} />}
         label="Terminal"
-        accent="#f59e0b"
-        accentBg="rgba(245,158,11,0.12)"
+        accent={toolbarTheme.accent.terminal}
+        accentBg="#fffbeb"
         onClick={() => addNode('terminal')}
         title="Add Terminal node — shows final payoff"
       />
@@ -115,23 +130,24 @@ export function Toolbar() {
 
       {/* Actions group */}
       <ActionBtn
-        icon={<RefreshCw size={13} />}
+        icon={<RefreshCw size={14} />}
         label="Recalculate"
         onClick={runEMV}
         title="Recalculate expected values and optimal path"
       />
       <ActionBtn
-        icon={<BarChart2 size={13} />}
+        icon={<BarChart2 size={14} />}
         label="Analyze"
         onClick={() => setAnalysisOpen(true)}
         title="Open Risk Profile and Sensitivity charts"
-        accent="#a855f7"
+        accent="#7c3aed"
+        highlight
       />
 
       <Divider />
 
-      <ActionBtn icon={<Save size={13} />} label="Save" onClick={handleSave} title="Export tree as JSON file" />
-      <ActionBtn icon={<FolderOpen size={13} />} label="Load" onClick={handleLoad} title="Import tree from JSON file" />
+      <ActionBtn icon={<Save size={14} />} label="Save" onClick={handleSave} title="Export tree as JSON file" />
+      <ActionBtn icon={<FolderOpen size={14} />} label="Load" onClick={handleLoad} title="Import tree from JSON file" />
 
       <Divider />
 
@@ -144,24 +160,30 @@ export function Toolbar() {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 5,
-          height: 32,
-          padding: '0 10px',
+          gap: 6,
+          height: 34,
+          padding: '0 12px',
           borderRadius: 6,
-          border: aiPanelOpen ? '1px solid rgba(139,92,246,0.6)' : '1px solid rgba(139,92,246,0.3)',
-          background: aiPanelOpen ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.08)',
-          color: '#a78bfa',
+          border: aiPanelOpen ? '1px solid #7c3aed' : `1px solid ${toolbarTheme.border}`,
+          background: aiPanelOpen ? '#ede9fe' : 'white',
+          color: '#7c3aed',
           fontSize: 12,
           fontWeight: 600,
           cursor: 'pointer',
           fontFamily: 'inherit',
-          transition: 'background 0.12s, border-color 0.12s',
+          transition: 'all 0.12s',
           flexShrink: 0,
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(139,92,246,0.25)'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.7)' }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = aiPanelOpen ? 'rgba(139,92,246,0.2)' : 'rgba(139,92,246,0.08)'; e.currentTarget.style.borderColor = aiPanelOpen ? 'rgba(139,92,246,0.6)' : 'rgba(139,92,246,0.3)' }}
+        onMouseEnter={(e) => { 
+          e.currentTarget.style.background = '#ede9fe'
+          e.currentTarget.style.borderColor = '#7c3aed'
+        }}
+        onMouseLeave={(e) => { 
+          e.currentTarget.style.background = aiPanelOpen ? '#ede9fe' : 'white'
+          e.currentTarget.style.borderColor = aiPanelOpen ? '#7c3aed' : toolbarTheme.border
+        }}
       >
-        <Bot size={13} />
+        <Bot size={14} />
         AI
       </button>
       <input
@@ -178,11 +200,20 @@ export function Toolbar() {
       {/* Legend */}
       <div
         aria-label="Node type legend"
-        style={{ display: 'flex', gap: 10, alignItems: 'center', marginRight: 8 }}
+        style={{ 
+          display: 'flex', 
+          gap: 14, 
+          alignItems: 'center', 
+          marginRight: 12,
+          padding: '6px 14px',
+          background: palette.gray[50],
+          border: `1px solid ${palette.gray[200]}`,
+          borderRadius: 8,
+        }}
       >
-        <LegendItem color="#3b82f6" label="Decision" shape="square" />
-        <LegendItem color="#22c55e" label="Chance" shape="circle" />
-        <LegendItem color="#f59e0b" label="Terminal" shape="hex" />
+        <LegendItem color={toolbarTheme.accent.decision} label="Decision" shape="square" />
+        <LegendItem color={toolbarTheme.accent.chance} label="Chance" shape="circle" />
+        <LegendItem color={toolbarTheme.accent.terminal} label="Terminal" shape="hex" />
       </div>
 
       <Divider />
@@ -194,20 +225,29 @@ export function Toolbar() {
           background: 'none',
           border: 'none',
           cursor: 'help',
-          padding: 6,
+          padding: 8,
           borderRadius: 6,
           display: 'flex',
           alignItems: 'center',
-          color: TB.textMuted,
+          color: toolbarTheme.textMuted,
+          transition: 'all 0.12s',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.color = toolbarTheme.text
+          e.currentTarget.style.background = palette.gray[100]
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.color = toolbarTheme.textMuted
+          e.currentTarget.style.background = 'transparent'
         }}
       >
-        <HelpCircle size={15} />
+        <HelpCircle size={18} />
       </button>
 
       <Divider />
 
       <ActionBtn
-        icon={<Trash2 size={13} />}
+        icon={<Trash2 size={14} />}
         label="Clear"
         onClick={() => { if (confirm('Clear the entire tree? This cannot be undone.')) clearTree() }}
         title="Remove all nodes and branches"
@@ -222,12 +262,12 @@ function GroupLabel({ label }: { label: string }) {
   return (
     <span
       style={{
-        color: TB.textLabel,
+        color: toolbarTheme.textMuted,
         fontSize: 10,
-        fontWeight: 600,
-        marginRight: 2,
+        fontWeight: 700,
+        marginRight: 4,
         textTransform: 'uppercase',
-        letterSpacing: '0.05em',
+        letterSpacing: '0.08em',
       }}
     >
       {label}:
@@ -236,7 +276,7 @@ function GroupLabel({ label }: { label: string }) {
 }
 
 function Divider() {
-  return <div style={{ width: 1, height: 22, background: TB.divider, margin: '0 6px', flexShrink: 0 }} />
+  return <div style={{ width: 1, height: 24, background: toolbarTheme.border, margin: '0 8px', flexShrink: 0 }} />
 }
 
 function NodeBtn({
@@ -262,26 +302,28 @@ function NodeBtn({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 5,
+        gap: 6,
         background: accentBg,
-        border: `1px solid ${accent}40`,
+        border: `1px solid ${accent}30`,
         borderRadius: 6,
-        padding: '0 10px',
-        height: 32,
+        padding: '0 12px',
+        height: 34,
         color: accent,
         fontSize: 12,
-        fontWeight: 500,
+        fontWeight: 600,
         cursor: 'pointer',
-        transition: 'background 0.12s, border-color 0.12s',
+        transition: 'all 0.12s',
         fontFamily: 'inherit',
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = `${accent}22`
-        e.currentTarget.style.borderColor = `${accent}80`
+        e.currentTarget.style.background = `${accent}25`
+        e.currentTarget.style.borderColor = `${accent}60`
+        e.currentTarget.style.transform = 'translateY(-1px)'
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = accentBg
-        e.currentTarget.style.borderColor = `${accent}40`
+        e.currentTarget.style.borderColor = `${accent}30`
+        e.currentTarget.style.transform = 'translateY(0)'
       }}
     >
       {icon}
@@ -297,6 +339,7 @@ function ActionBtn({
   title,
   accent,
   danger,
+  highlight,
 }: {
   icon: React.ReactNode
   label: string
@@ -304,8 +347,9 @@ function ActionBtn({
   title?: string
   accent?: string
   danger?: boolean
+  highlight?: boolean
 }) {
-  const color = danger ? '#ef4444' : accent ?? TB.textLabel
+  const color = danger ? '#ef4444' : accent ?? toolbarTheme.text
   return (
     <button
       onClick={onClick}
@@ -314,27 +358,29 @@ function ActionBtn({
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 5,
-        background: 'transparent',
-        border: `1px solid ${TB.btnBorder}`,
+        gap: 6,
+        background: highlight ? `${accent}15` : 'transparent',
+        border: `1px solid ${highlight ? `${accent}40` : toolbarTheme.border}`,
         borderRadius: 6,
-        padding: '0 9px',
-        height: 32,
+        padding: '0 11px',
+        height: 34,
         color,
         fontSize: 12,
-        fontWeight: 500,
+        fontWeight: 600,
         cursor: 'pointer',
-        transition: 'background 0.12s, border-color 0.12s, color 0.12s',
+        transition: 'all 0.12s',
         fontFamily: 'inherit',
         flexShrink: 0,
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = danger ? 'rgba(239,68,68,0.1)' : TB.btnHover
-        e.currentTarget.style.borderColor = danger ? 'rgba(239,68,68,0.4)' : '#475569'
+        e.currentTarget.style.background = danger ? '#fee2e2' : highlight ? `${accent}18` : palette.gray[100]
+        e.currentTarget.style.borderColor = danger ? '#fca5a5' : highlight ? `${accent}60` : palette.gray[300]
+        e.currentTarget.style.transform = 'translateY(-1px)'
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = 'transparent'
-        e.currentTarget.style.borderColor = TB.btnBorder
+        e.currentTarget.style.background = highlight ? `${accent}15` : 'transparent'
+        e.currentTarget.style.borderColor = highlight ? `${accent}40` : toolbarTheme.border
+        e.currentTarget.style.transform = 'translateY(0)'
       }}
     >
       {icon}
@@ -359,9 +405,9 @@ function LegendItem({
         ? { clipPath: 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)' }
         : { borderRadius: 2 }
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <div style={{ width: 10, height: 10, background: color, flexShrink: 0, ...shapeStyle }} />
-      <span style={{ color: TB.textLabel, fontSize: 10, fontWeight: 500 }}>{label}</span>
+      <span style={{ color: toolbarTheme.textMuted, fontSize: 11, fontWeight: 500 }}>{label}</span>
     </div>
   )
 }

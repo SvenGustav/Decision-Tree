@@ -12,6 +12,7 @@ import { ChanceNode } from './nodes/ChanceNode'
 import { TerminalNode } from './nodes/TerminalNode'
 import { BranchEdge } from './edges/BranchEdge'
 import type { TreeNode } from '../../types/tree'
+import { palette } from '../../theme'
 
 const nodeTypes = {
   decisionNode: DecisionNode,
@@ -46,39 +47,63 @@ export function DecisionCanvas() {
       const target = event.target as HTMLElement
       if (target.closest('.react-flow__node')) return
       const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect()
-      addNode('decision', { x: event.clientX - bounds.left - 40, y: event.clientY - bounds.top - 40 })
+      addNode('decision', { x: event.clientX - bounds.left - 44, y: event.clientY - bounds.top - 44 })
     },
     [addNode],
   )
 
+  const getMinimapNodeColor = (n: TreeNode) => {
+    if (n.type === 'decisionNode') return palette.decision.borderActive
+    if (n.type === 'chanceNode') return palette.chance.borderActive
+    if (n.data.payoff && n.data.payoff < 0) return '#dc2626'
+    return palette.terminal.positive.borderActive
+  }
+
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onConnect={onConnect}
-      onPaneClick={onPaneClick}
-      onDoubleClick={onPaneDoubleClick}
-      nodeTypes={nodeTypes as unknown as typeof nodeTypes}
-      edgeTypes={edgeTypes}
-      defaultEdgeOptions={{ type: 'default' }}
-      fitView
-      fitViewOptions={{ padding: 0.2 }}
-      deleteKeyCode="Delete"
-      minZoom={0.2}
-      maxZoom={3}
-    >
-      <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#cbd5e1" />
-      <Controls />
-      <MiniMap
-        nodeColor={(n: TreeNode) => {
-          if (n.type === 'decisionNode') return '#3b82f6'
-          if (n.type === 'chanceNode') return '#22c55e'
-          return '#f59e0b'
-        }}
-        style={{ background: '#f1f5f9', border: '1px solid #e2e8f0' }}
-      />
-    </ReactFlow>
+    <div style={{ width: '100%', height: '100%', background: palette.canvas }}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onPaneClick={onPaneClick}
+        onDoubleClick={onPaneDoubleClick}
+        nodeTypes={nodeTypes as unknown as typeof nodeTypes}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={{ type: 'default' }}
+        fitView
+        fitViewOptions={{ padding: 0.2 }}
+        deleteKeyCode="Delete"
+        minZoom={0.2}
+        maxZoom={3}
+      >
+        <Background 
+          variant={BackgroundVariant.Dots} 
+          gap={24} 
+          size={1.5} 
+          color={palette.canvasGrid}
+        />
+        <Controls 
+          style={{
+            background: '#ffffff',
+            border: `1px solid ${palette.gray[200]}`,
+            borderRadius: 8,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+          }}
+        />
+        <MiniMap
+          nodeColor={getMinimapNodeColor}
+          style={{ 
+            background: '#ffffff', 
+            border: `1px solid ${palette.gray[200]}`,
+            borderRadius: 8,
+            boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+          }}
+          nodeBorderRadius={4}
+          maskColor={`${palette.gray[200]}80`}
+        />
+      </ReactFlow>
+    </div>
   )
 }

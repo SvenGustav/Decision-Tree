@@ -1,31 +1,8 @@
-import { Trash2, AlertTriangle, CheckCircle2, Info } from 'lucide-react'
+import { useState } from 'react'
+import { Trash2, AlertTriangle, CheckCircle2, Info, GitBranch, Calculator, RotateCcw } from 'lucide-react'
 import { useTreeStore } from '../../store/treeStore'
-import { normalizeProbabilities } from '../../engine/bayesian'
-
-// ── Semantic tokens ──────────────────────────────────────────────
-const T = {
-  panelBg: '#ffffff',
-  sectionBg: '#f8fafc',
-  sectionBorder: '#e2e8f0',
-  textPrimary: '#0f172a',
-  textSecondary: '#475569',
-  textMuted: '#94a3b8',
-  decision: '#2563eb',
-  chance: '#16a34a',
-  terminal: '#d97706',
-  error: '#dc2626',
-  errorBg: '#fef2f2',
-  errorBorder: '#fecaca',
-  success: '#16a34a',
-  successBg: '#f0fdf4',
-  successBorder: '#bbf7d0',
-  warning: '#d97706',
-  warningBg: '#fffbeb',
-  warningBorder: '#fde68a',
-  inputBg: '#f8fafc',
-  inputBorder: '#cbd5e1',
-  inputBorderFocus: '#2563eb',
-}
+import { normalizeProbabilities, bayesianSwap, restorePriors } from '../../engine/bayesian'
+import { palette, panelTheme } from '../../theme'
 
 function probTotal(edges: ReturnType<typeof useTreeStore.getState>['edges'], nodeId: string) {
   return edges
@@ -48,30 +25,39 @@ export function PropertiesPanel() {
     <aside
       aria-label="Properties"
       style={{
-        width: 260,
-        minWidth: 260,
+        width: 280,
+        minWidth: 280,
         flexShrink: 0,
-        background: T.panelBg,
-        borderLeft: `1px solid ${T.sectionBorder}`,
+        background: panelTheme.bg,
+        borderLeft: `1px solid ${panelTheme.border}`,
         display: 'flex',
         flexDirection: 'column',
         overflowY: 'auto',
         overflowX: 'hidden',
+        boxShadow: '-4px 0 20px rgba(0,0,0,0.15)',
       }}
     >
       <div
         style={{
-          padding: '10px 14px 8px',
-          borderBottom: `1px solid ${T.sectionBorder}`,
-          background: T.sectionBg,
+          padding: '14px 16px 12px',
+          borderBottom: `1px solid ${panelTheme.border}`,
+          background: panelTheme.headerBg,
         }}
       >
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', color: T.textMuted }}>
-          PROPERTIES
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{
+            width: 8,
+            height: 8,
+            background: palette.decision.optimal,
+            borderRadius: 2,
+          }} />
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: palette.gray[500] }}>
+            PROPERTIES
+          </span>
+        </div>
       </div>
 
-      <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 14, flex: 1 }}>
+      <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 16, flex: 1 }}>
         {!selectedNode && !selectedEdge && <EmptyState />}
         {selectedNode && <NodePanel node={selectedNode} store={store} />}
         {selectedEdge && !selectedNode && (
@@ -91,23 +77,49 @@ function NodePanel({
 }) {
   const { updateNodeData, deleteNode, loadSnapshot, edges, nodes } = store
   const d = node.data
-  const kindColors: Record<string, string> = { decision: T.decision, chance: T.chance, terminal: T.terminal }
-  const kindLabels: Record<string, string> = { decision: 'Decision Node', chance: 'Chance Node', terminal: 'Terminal Node' }
-  const accent = kindColors[d.kind] ?? T.textSecondary
+  
+  const kindColors = {
+    decision: palette.decision.base,
+    chance: palette.chance.base,
+    terminal: palette.terminal.positive.base,
+  }
+  const kindLabels = {
+    decision: 'Decision Node',
+    chance: 'Chance Node',
+    terminal: 'Terminal Node',
+  }
+  const accent = kindColors[d.kind] ?? palette.gray[600]
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '12px 14px',
+        background: `${accent}10`,
+        borderRadius: 8,
+        border: `1px solid ${accent}30`,
+      }}>
         <div
           style={{
-            width: 10, height: 10, background: accent, flexShrink: 0,
-            borderRadius: d.kind === 'decision' ? 2 : d.kind === 'chance' ? '50%' : 0,
+            width: 12,
+            height: 12,
+            background: accent,
+            flexShrink: 0,
+            borderRadius: d.kind === 'decision' ? 3 : d.kind === 'chance' ? '50%' : 0,
             clipPath: d.kind === 'terminal' ? 'polygon(50% 0%, 100% 100%, 0% 100%)' : undefined,
           }}
         />
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', color: accent }}>
-          {kindLabels[d.kind] ?? 'NODE'}
-        </span>
+        <div>
+          <span style={{ fontSize: 12, fontWeight: 700, color: accent, display: 'block' }}>
+            {kindLabels[d.kind] ?? 'NODE'}
+          </span>
+          <span style={{ fontSize: 11, color: palette.gray[500] }}>
+            ID: {node.id}
+          </span>
+        </div>
       </div>
 
       <FormField label="Label" id={`label-${node.id}`}>
@@ -132,21 +144,220 @@ function NodePanel({
       )}
 
       {d.emv !== undefined && d.kind !== 'terminal' && (
-        <EmvCard emv={d.emv} isOptimal={d.isOptimal ?? false} />
+        <EmvCard emv={d.emv} isOptimal={d.isOptimal ?? false} kind={d.kind} />
       )}
 
       {d.kind === 'chance' && (
-        <BranchProbEditor
-          nodeId={node.id}
-          edges={edges}
-          nodes={nodes}
-          loadSnapshot={loadSnapshot}
-          updateEdgeData={store.updateEdgeData}
-        />
+        <>
+          <BranchProbEditor
+            nodeId={node.id}
+            edges={edges}
+            nodes={nodes}
+            loadSnapshot={loadSnapshot}
+            updateEdgeData={store.updateEdgeData}
+          />
+          <BayesianSection
+            nodeId={node.id}
+            nodes={nodes}
+            edges={edges}
+            loadSnapshot={loadSnapshot}
+          />
+        </>
       )}
 
       <DangerButton label="Delete Node" onConfirm={() => deleteNode(node.id)} />
     </>
+  )
+}
+
+function BayesianSection({
+  nodeId,
+  nodes,
+  edges,
+  loadSnapshot,
+}: {
+  nodeId: string
+  nodes: ReturnType<typeof useTreeStore.getState>['nodes']
+  edges: ReturnType<typeof useTreeStore.getState>['edges']
+  loadSnapshot: ReturnType<typeof useTreeStore.getState>['loadSnapshot']
+}) {
+  const [showLikelihoods, setShowLikelihoods] = useState(false)
+  const [likelihoods, setLikelihoods] = useState<Record<string, number>>({})
+
+  const outgoing = edges.filter((e) => e.source === nodeId)
+  const hasPriors = outgoing.some(e => e.data?.priorProbability !== undefined)
+
+  const handleApplyBayesian = () => {
+    const { newEdges } = bayesianSwap(nodeId, nodes, edges, likelihoods)
+    loadSnapshot({ nodes, edges: newEdges })
+  }
+
+  const handleRestore = () => {
+    const newEdges = restorePriors(nodeId, edges)
+    loadSnapshot({ nodes, edges: newEdges })
+  }
+
+  if (!showLikelihoods) {
+    return (
+      <div style={{
+        padding: 14,
+        background: `${palette.chance.base}08`,
+        border: `1px solid ${palette.chance.border}40`,
+        borderRadius: 8,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <GitBranch size={14} color={palette.chance.base} />
+          <span style={{ fontSize: 12, fontWeight: 600, color: palette.chance.base }}>
+            Bayesian Analysis
+          </span>
+        </div>
+        <p style={{ margin: '0 0 12px', fontSize: 11, color: palette.gray[500], lineHeight: 1.5 }}>
+          Update probabilities based on new evidence using Bayes' theorem.
+        </p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => {
+              const initial: Record<string, number> = {}
+              for (const edge of outgoing) {
+                initial[edge.id] = 0.5
+              }
+              setLikelihoods(initial)
+              setShowLikelihoods(true)
+            }}
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              background: palette.chance.borderActive,
+              border: 'none',
+              borderRadius: 6,
+              color: 'white',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}
+          >
+            <Calculator size={14} />
+            Open
+          </button>
+          {hasPriors && (
+            <button
+              onClick={handleRestore}
+              style={{
+                padding: '8px 12px',
+                background: 'white',
+                border: `1px solid ${palette.gray[300]}`,
+                borderRadius: 6,
+                color: palette.gray[600],
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <RotateCcw size={14} />
+              Restore
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      padding: 14,
+      background: 'white',
+      border: `1px solid ${palette.chance.border}`,
+      borderRadius: 8,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: palette.chance.base }}>
+          Likelihoods P(E|Outcome)
+        </span>
+        <button
+          onClick={() => setShowLikelihoods(false)}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: palette.gray[400],
+            cursor: 'pointer',
+            padding: 2,
+          }}
+        >
+          <span style={{ fontSize: 16 }}>×</span>
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {outgoing.map(edge => {
+          const targetNode = nodes.find(n => n.id === edge.target)
+          return (
+            <div key={edge.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: 11, color: palette.gray[600] }}>
+                {edge.data?.label || targetNode?.data.label || 'Branch'}
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={likelihoods[edge.id] ?? 0.5}
+                  onChange={(e) => setLikelihoods(prev => ({
+                    ...prev,
+                    [edge.id]: parseFloat(e.target.value)
+                  }))}
+                  style={{ flex: 1 }}
+                />
+                <input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={likelihoods[edge.id] ?? 0.5}
+                  onChange={(e) => setLikelihoods(prev => ({
+                    ...prev,
+                    [edge.id]: parseFloat(e.target.value) || 0
+                  }))}
+                  style={{
+                    width: 56,
+                    padding: '4px 6px',
+                    border: `1px solid ${palette.gray[300]}`,
+                    borderRadius: 4,
+                    fontSize: 11,
+                    textAlign: 'right',
+                  }}
+                />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <button
+        onClick={handleApplyBayesian}
+        style={{
+          width: '100%',
+          marginTop: 12,
+          padding: '10px',
+          background: palette.chance.borderActive,
+          border: 'none',
+          borderRadius: 6,
+          color: 'white',
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: 'pointer',
+        }}
+      >
+        Apply Bayesian Update
+      </button>
+    </div>
   )
 }
 
@@ -167,16 +378,23 @@ function EdgePanel({
 
   return (
     <>
-      <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', color: T.textMuted }}>
-        BRANCH
-      </span>
-      {sourceNode && targetNode && (
-        <div style={{ fontSize: 12, color: T.textSecondary }}>
-          <span style={{ fontWeight: 600, color: T.textPrimary }}>{sourceNode.data.label}</span>
-          {' → '}
-          <span style={{ fontWeight: 600, color: T.textPrimary }}>{targetNode.data.label}</span>
-        </div>
-      )}
+      <div style={{
+        padding: '12px 14px',
+        background: `${palette.decision.base}08`,
+        border: `1px solid ${palette.decision.border}40`,
+        borderRadius: 8,
+      }}>
+        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', color: palette.gray[400] }}>
+          BRANCH
+        </span>
+        {sourceNode && targetNode && (
+          <div style={{ fontSize: 13, color: palette.gray[700], marginTop: 4 }}>
+            <span style={{ fontWeight: 600, color: palette.gray[900] }}>{sourceNode.data.label}</span>
+            <span style={{ color: palette.gray[400], margin: '0 6px' }}>→</span>
+            <span style={{ fontWeight: 600, color: palette.gray[900] }}>{targetNode.data.label}</span>
+          </div>
+        )}
+      </div>
 
       <FormField label="Label" id={`elabel-${edge.id}`}>
         <StyledInput
@@ -190,23 +408,29 @@ function EdgePanel({
 
       {isChanceBranch && (
         <FormField
-          label="Probability (0–1)"
+          label="Probability"
           id={`eprob-${edge.id}`}
-          hint="e.g. 0.40 = 40%"
+          hint="Enter value between 0 and 1 (e.g., 0.40 = 40%)"
         >
-          <StyledInput
-            id={`eprob-${edge.id}`}
-            type="number"
-            min={0}
-            max={1}
-            step={0.01}
-            value={d.probability ?? 0}
-            onChange={(e) =>
-              updateEdgeData(edge.id, {
-                probability: Math.min(1, Math.max(0, parseFloat(e.target.value) || 0)),
-              })
-            }
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <StyledInput
+              id={`eprob-${edge.id}`}
+              type="number"
+              min={0}
+              max={1}
+              step={0.01}
+              value={d.probability ?? 0}
+              onChange={(e) =>
+                updateEdgeData(edge.id, {
+                  probability: Math.min(1, Math.max(0, parseFloat(e.target.value) || 0)),
+                })
+              }
+              style={{ flex: 1 }}
+            />
+            <span style={{ fontSize: 13, color: palette.gray[500], fontWeight: 500 }}>
+              {(d.probability ?? 0) * 100}%
+            </span>
+          </div>
         </FormField>
       )}
 
@@ -259,206 +483,261 @@ function BranchProbEditor({
   const remaining = (1 - total) * 100
 
   return (
-    <Section label="Branch Probabilities">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {outgoing.map((e) => {
-          const targetLabel = nodes.find((n) => n.id === e.target)?.data.label ?? e.id
-          const prob = e.data?.probability ?? 0
-          const isHighlighted = e.id === highlightEdgeId
-          return (
-            <div
-              key={e.id}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 76px',
-                gap: 6,
-                alignItems: 'center',
-                padding: '3px 6px',
-                borderRadius: 6,
-                background: isHighlighted ? '#eff6ff' : 'transparent',
-                border: isHighlighted ? '1px solid #bfdbfe' : '1px solid transparent',
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 12,
-                  color: T.textPrimary,
-                  fontWeight: isHighlighted ? 600 : 400,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-                title={targetLabel}
-              >
-                {e.data?.label ?? targetLabel}
-              </span>
-              <input
-                type="number"
-                min={0}
-                max={1}
-                step={0.01}
-                value={prob}
-                aria-label={`Probability for ${targetLabel}`}
-                onChange={(ev) =>
-                  updateEdgeData(e.id, {
-                    probability: Math.min(1, Math.max(0, parseFloat(ev.target.value) || 0)),
-                  })
-                }
-                style={{
-                  width: '100%',
-                  height: 32,
-                  padding: '0 6px',
-                  border: `1px solid ${T.inputBorder}`,
-                  borderRadius: 5,
-                  fontSize: 12,
-                  fontFamily: 'inherit',
-                  background: T.inputBg,
-                  color: T.textPrimary,
-                  boxSizing: 'border-box',
-                  outline: 'none',
-                }}
-                onFocus={(ev) => {
-                  ev.target.style.borderColor = T.inputBorderFocus
-                  ev.target.style.boxShadow = '0 0 0 2px rgba(37,99,235,0.15)'
-                }}
-                onBlur={(ev) => {
-                  ev.target.style.borderColor = T.inputBorder
-                  ev.target.style.boxShadow = 'none'
-                }}
-              />
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Progress bar */}
+    <div style={{
+      borderRadius: 8,
+      border: `1px solid ${panelTheme.border}`,
+      overflow: 'hidden',
+      background: panelTheme.sectionBg,
+    }}>
       <div
-        aria-hidden="true"
-        style={{ height: 5, borderRadius: 4, background: '#e2e8f0', overflow: 'hidden', marginTop: 4 }}
-      >
-        <div
-          style={{
-            height: '100%',
-            width: `${Math.min(100, totalPct)}%`,
-            background: isValid ? T.success : totalPct > 100 ? T.error : T.warning,
-            borderRadius: 4,
-            transition: 'width 0.2s ease, background 0.2s ease',
-          }}
-        />
-      </div>
-
-      {/* Sum status chip */}
-      <div
-        role={isValid ? undefined : 'alert'}
         style={{
-          padding: '7px 10px',
-          borderRadius: 7,
-          background: isValid ? T.successBg : totalPct > 100 ? T.errorBg : T.warningBg,
-          border: `1px solid ${isValid ? T.successBorder : totalPct > 100 ? T.errorBorder : T.warningBorder}`,
+          padding: '10px 12px',
+          background: panelTheme.headerBg,
+          borderBottom: `1px solid ${panelTheme.border}`,
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: '0.05em',
+          color: palette.gray[500],
           display: 'flex',
-          alignItems: 'flex-start',
-          gap: 7,
+          alignItems: 'center',
+          gap: 6,
         }}
       >
-        {isValid ? (
-          <CheckCircle2 size={14} color={T.success} style={{ flexShrink: 0, marginTop: 1 }} />
-        ) : (
-          <AlertTriangle size={14} color={totalPct > 100 ? T.error : T.warning} style={{ flexShrink: 0, marginTop: 1 }} />
+        <span>Branch Probabilities</span>
+        {!isValid && (
+          <span style={{
+            marginLeft: 'auto',
+            padding: '2px 6px',
+            background: totalPct > 100 ? `${palette.error}20` : `${palette.warning}20`,
+            color: totalPct > 100 ? palette.error : palette.warning,
+            borderRadius: 4,
+            fontSize: 10,
+          }}>
+            {totalPct.toFixed(0)}%
+          </span>
         )}
-        <div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: isValid ? T.success : totalPct > 100 ? T.error : T.warning }}>
-            Total: {totalPct.toFixed(1)}%
-            {isValid
-              ? ' — valid ✓'
-              : totalPct > 100
-                ? ' — over 100%'
-                : ` — needs ${remaining.toFixed(1)}% more`}
-          </div>
-          {!isValid && (
-            <div style={{ fontSize: 11, color: T.textSecondary, marginTop: 1 }}>
-              {totalPct > 100
-                ? 'Reduce one or more values so they sum to 100%.'
-                : 'All branches must sum to exactly 100%.'}
-            </div>
-          )}
+      </div>
+      
+      <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {outgoing.map((e) => {
+            const targetLabel = nodes.find((n) => n.id === e.target)?.data.label ?? e.id
+            const prob = e.data?.probability ?? 0
+            const isHighlighted = e.id === highlightEdgeId
+            return (
+              <div
+                key={e.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 80px',
+                  gap: 8,
+                  alignItems: 'center',
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  background: isHighlighted ? `${palette.decision.optimal}15` : 'white',
+                  border: isHighlighted ? `1px solid ${palette.decision.optimal}40` : `1px solid ${palette.gray[200]}`,
+                  transition: 'all 0.15s',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: isHighlighted ? palette.gray[900] : palette.gray[600],
+                    fontWeight: isHighlighted ? 600 : 500,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title={targetLabel}
+                >
+                  {e.data?.label ?? targetLabel}
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={prob}
+                    aria-label={`Probability for ${targetLabel}`}
+                    onChange={(ev) =>
+                      updateEdgeData(e.id, {
+                        probability: Math.min(1, Math.max(0, parseFloat(ev.target.value) || 0)),
+                      })
+                    }
+                    style={{
+                      width: '100%',
+                      height: 32,
+                      padding: '0 8px',
+                      border: `1px solid ${palette.gray[300]}`,
+                      borderRadius: 5,
+                      fontSize: 12,
+                      fontFamily: 'inherit',
+                      background: 'white',
+                      color: palette.gray[800],
+                      boxSizing: 'border-box',
+                      outline: 'none',
+                      textAlign: 'right',
+                    }}
+                    onFocus={(ev) => {
+                      ev.target.style.borderColor = palette.decision.optimal
+                      ev.target.style.boxShadow = `0 0 0 3px ${palette.decision.optimal}20`
+                    }}
+                    onBlur={(ev) => {
+                      ev.target.style.borderColor = palette.gray[300]
+                      ev.target.style.boxShadow = 'none'
+                    }}
+                  />
+                  <span style={{ fontSize: 11, color: palette.gray[400], width: 16 }}>%</span>
+                </div>
+              </div>
+            )
+          })}
         </div>
-      </div>
 
-      {/* Auto-normalize button — shown only when invalid */}
-      {!isValid && (
-        <button
-          onClick={() => {
-            const newEdges = normalizeProbabilities(nodeId, edges)
-            loadSnapshot({ nodes, edges: newEdges })
-          }}
-          style={{
-            padding: '8px 12px',
-            background: '#2563eb',
-            border: 'none',
-            borderRadius: 6,
-            color: '#fff',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            width: '100%',
-            transition: 'background 0.15s',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = '#1d4ed8')}
-          onMouseLeave={(e) => (e.currentTarget.style.background = '#2563eb')}
-        >
-          Auto-normalize to 100%
-        </button>
-      )}
-    </Section>
-  )
-}
-
-function EmvCard({ emv, isOptimal }: { emv: number; isOptimal: boolean }) {
-  const positive = emv >= 0
-  return (
-    <div
-      style={{
-        borderRadius: 8,
-        padding: '10px 12px',
-        background: positive ? T.successBg : T.errorBg,
-        border: `1px solid ${positive ? T.successBorder : T.errorBorder}`,
-      }}
-    >
-      <div style={{ fontSize: 11, color: T.textSecondary, marginBottom: 2 }}>Expected Monetary Value</div>
-      <div style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums', color: positive ? T.success : T.error, lineHeight: 1.2 }}>
-        {emv >= 0 ? '+' : ''}{emv.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-      </div>
-      {isOptimal && (
+        {/* Progress bar */}
         <div
+          aria-hidden="true"
+          style={{ height: 6, borderRadius: 3, background: palette.gray[200], overflow: 'hidden' }}
+        >
+          <div
+            style={{
+              height: '100%',
+              width: `${Math.min(100, totalPct)}%`,
+              background: isValid 
+                ? palette.success 
+                : totalPct > 100 
+                  ? palette.error 
+                  : palette.warning,
+              borderRadius: 3,
+              transition: 'width 0.2s ease, background 0.2s ease',
+            }}
+          />
+        </div>
+
+        {/* Status */}
+        <div
+          role={isValid ? undefined : 'alert'}
           style={{
-            marginTop: 5, fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
-            color: T.decision, background: '#eff6ff', border: '1px solid #bfdbfe',
-            borderRadius: 4, padding: '2px 6px', display: 'inline-block',
+            padding: '10px 12px',
+            borderRadius: 6,
+            background: isValid 
+              ? `${palette.success}10` 
+              : totalPct > 100 
+                ? `${palette.error}10` 
+                : `${palette.warning}10`,
+            border: `1px solid ${isValid 
+              ? `${palette.success}30` 
+              : totalPct > 100 
+                ? `${palette.error}30` 
+                : `${palette.warning}30`}`,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 8,
           }}
         >
-          OPTIMAL PATH
+          {isValid ? (
+            <CheckCircle2 size={14} color={palette.success} style={{ flexShrink: 0, marginTop: 1 }} />
+          ) : (
+            <AlertTriangle size={14} color={totalPct > 100 ? palette.error : palette.warning} style={{ flexShrink: 0, marginTop: 1 }} />
+          )}
+          <div>
+            <div style={{ 
+              fontSize: 12, 
+              fontWeight: 600, 
+              color: isValid ? palette.success : totalPct > 100 ? palette.error : palette.warning 
+            }}>
+              Total: {totalPct.toFixed(1)}%
+              {isValid
+                ? ' — valid ✓'
+                : totalPct > 100
+                  ? ' — exceeds 100%'
+                  : ` — needs ${remaining.toFixed(1)}% more`}
+            </div>
+            {!isValid && (
+              <div style={{ fontSize: 11, color: palette.gray[500], marginTop: 2 }}>
+                {totalPct > 100
+                  ? 'Reduce values so they sum to exactly 100%.'
+                  : 'All branches must sum to exactly 100%.'}
+              </div>
+            )}
+          </div>
         </div>
-      )}
+
+        {/* Auto-normalize button */}
+        {!isValid && (
+          <button
+            onClick={() => {
+              const newEdges = normalizeProbabilities(nodeId, edges)
+              loadSnapshot({ nodes, edges: newEdges })
+            }}
+            style={{
+              padding: '10px 12px',
+              background: palette.decision.optimal,
+              border: 'none',
+              borderRadius: 6,
+              color: 'white',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              width: '100%',
+              transition: 'all 0.15s',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#1e40af')}
+            onMouseLeave={(e) => (e.currentTarget.style.background = palette.decision.optimal)}
+          >
+            <RotateCcw size={14} />
+            Auto-normalize to 100%
+          </button>
+        )}
+      </div>
     </div>
   )
 }
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+function EmvCard({ emv, isOptimal, kind }: { emv: number; isOptimal: boolean; kind: string }) {
+  const positive = emv >= 0
+  const accentColor = kind === 'decision' ? palette.decision.base : palette.chance.base
+  
   return (
-    <div style={{ borderRadius: 8, border: `1px solid ${T.sectionBorder}`, overflow: 'hidden' }}>
-      <div
-        style={{
-          padding: '6px 10px',
-          background: T.sectionBg,
-          borderBottom: `1px solid ${T.sectionBorder}`,
-          fontSize: 11, fontWeight: 700, letterSpacing: '0.05em', color: T.textSecondary,
-        }}
-      >
-        {label}
+    <div
+      style={{
+        borderRadius: 8,
+        padding: '14px',
+        background: positive ? `${palette.success}08` : `${palette.error}08`,
+        border: `1px solid ${positive ? `${palette.success}30` : `${palette.error}30`}`,
+      }}
+    >
+      <div style={{ fontSize: 11, color: palette.gray[500], marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+        Expected Monetary Value
+        {isOptimal && (
+          <span style={{
+            padding: '2px 8px',
+            background: `${accentColor}20`,
+            color: accentColor,
+            borderRadius: 4,
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: '0.05em',
+          }}>
+            OPTIMAL
+          </span>
+        )}
       </div>
-      <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {children}
+      <div style={{ 
+        fontSize: 24, 
+        fontWeight: 700, 
+        fontVariantNumeric: 'tabular-nums', 
+        color: positive ? palette.success : palette.error,
+        lineHeight: 1.2,
+        letterSpacing: '-0.02em',
+      }}>
+        {emv >= 0 ? '+' : ''}{emv.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
       </div>
     </div>
   )
@@ -474,19 +753,19 @@ function FormField({
   error?: string
 }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-      <label htmlFor={id} style={{ fontSize: 12, fontWeight: 500, color: T.textSecondary }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <label htmlFor={id} style={{ fontSize: 12, fontWeight: 600, color: palette.gray[600] }}>
         {label}
       </label>
       {children}
       {hint && !error && (
-        <span style={{ fontSize: 11, color: T.textMuted, display: 'flex', alignItems: 'center', gap: 3 }}>
+        <span style={{ fontSize: 11, color: palette.gray[400], display: 'flex', alignItems: 'center', gap: 4 }}>
           <Info size={10} />
           {hint}
         </span>
       )}
       {error && (
-        <span role="alert" style={{ fontSize: 11, color: T.error, display: 'flex', alignItems: 'center', gap: 3 }}>
+        <span role="alert" style={{ fontSize: 11, color: palette.error, display: 'flex', alignItems: 'center', gap: 4 }}>
           <AlertTriangle size={10} />
           {error}
         </span>
@@ -501,26 +780,26 @@ function StyledInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
       {...props}
       style={{
         width: '100%',
-        height: 38,
-        padding: '0 10px',
-        border: `1px solid ${T.inputBorder}`,
+        height: 40,
+        padding: '0 12px',
+        border: `1px solid ${palette.gray[300]}`,
         borderRadius: 6,
-        fontSize: 13,
+        fontSize: 14,
         fontFamily: 'inherit',
-        background: T.inputBg,
-        color: T.textPrimary,
+        background: 'white',
+        color: palette.gray[800],
         boxSizing: 'border-box',
         outline: 'none',
-        transition: 'border-color 0.15s, box-shadow 0.15s',
+        transition: 'all 0.15s',
         ...props.style,
       }}
       onFocus={(e) => {
-        e.currentTarget.style.borderColor = T.inputBorderFocus
-        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)'
+        e.currentTarget.style.borderColor = palette.decision.optimal
+        e.currentTarget.style.boxShadow = `0 0 0 3px ${palette.decision.optimal}15`
         props.onFocus?.(e)
       }}
       onBlur={(e) => {
-        e.currentTarget.style.borderColor = T.inputBorder
+        e.currentTarget.style.borderColor = palette.gray[300]
         e.currentTarget.style.boxShadow = 'none'
         props.onBlur?.(e)
       }}
@@ -531,20 +810,36 @@ function StyledInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
 function DangerButton({ label, onConfirm }: { label: string; onConfirm: () => void }) {
   return (
     <button
-      onClick={() => { if (confirm(`${label}?`)) onConfirm() }}
+      onClick={() => { if (confirm(`${label}? This action cannot be undone.`)) onConfirm() }}
       aria-label={label}
       style={{
-        marginTop: 4, width: '100%', height: 36,
-        background: 'transparent', border: `1px solid ${T.errorBorder}`,
-        borderRadius: 6, color: T.error, fontSize: 12, fontWeight: 500,
-        cursor: 'pointer', fontFamily: 'inherit',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        transition: 'background 0.15s',
+        marginTop: 8,
+        width: '100%',
+        height: 40,
+        background: 'transparent',
+        border: `1px solid ${palette.error}40`,
+        borderRadius: 6,
+        color: palette.error,
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        transition: 'all 0.15s',
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.background = T.errorBg)}
-      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = `${palette.error}10`
+        e.currentTarget.style.borderColor = `${palette.error}60`
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = 'transparent'
+        e.currentTarget.style.borderColor = `${palette.error}40`
+      }}
     >
-      <Trash2 size={13} />
+      <Trash2 size={14} />
       {label}
     </button>
   )
@@ -552,23 +847,53 @@ function DangerButton({ label, onConfirm }: { label: string; onConfirm: () => vo
 
 function EmptyState() {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '24px 8px', textAlign: 'center' }}>
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 3h7v7H3z"/><circle cx="17.5" cy="6.5" r="3.5"/><path d="M14 21v-4a2 2 0 0 1 4 0v4"/><path d="M10 21h4"/><path d="M7 10v11"/>
-      </svg>
-      <div style={{ fontSize: 13, color: T.textSecondary, lineHeight: 1.5 }}>
-        Click a node or branch to edit its properties.
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      gap: 16, 
+      padding: '32px 16px', 
+      textAlign: 'center',
+      color: palette.gray[400],
+    }}>
+      <div style={{
+        width: 64,
+        height: 64,
+        background: palette.gray[100],
+        borderRadius: 16,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={palette.gray[400]} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 3h7v7H3z"/><circle cx="17.5" cy="6.5" r="3.5"/><path d="M14 21v-4a2 2 0 0 1 4 0v4"/><path d="M10 21h4"/><path d="M7 10v11"/>
+        </svg>
       </div>
-      <div
-        style={{
-          padding: '10px 12px', background: T.sectionBg, border: `1px solid ${T.sectionBorder}`,
-          borderRadius: 8, fontSize: 11, color: T.textMuted, lineHeight: 1.7, textAlign: 'left', width: '100%',
-        }}
-      >
-        <div style={{ fontWeight: 600, color: T.textSecondary, marginBottom: 4 }}>Quick tips</div>
-        <ul style={{ margin: 0, paddingLeft: 14 }}>
+      <div>
+        <div style={{ fontSize: 15, color: palette.gray[600], fontWeight: 600, marginBottom: 4 }}>
+          No Selection
+        </div>
+        <div style={{ fontSize: 13, color: palette.gray[500], lineHeight: 1.5 }}>
+          Click a node or branch to edit its properties
+        </div>
+      </div>
+      <div style={{
+        padding: '16px',
+        background: palette.gray[50],
+        border: `1px solid ${palette.gray[200]}`,
+        borderRadius: 10,
+        fontSize: 12,
+        color: palette.gray[500],
+        lineHeight: 1.8,
+        textAlign: 'left',
+        width: '100%',
+      }}>
+        <div style={{ fontWeight: 700, color: palette.gray[700], marginBottom: 8, fontSize: 11, letterSpacing: '0.05em' }}>
+          QUICK TIPS
+        </div>
+        <ul style={{ margin: 0, paddingLeft: 16 }}>
           <li>Drag handles to connect nodes</li>
-          <li>Double-click canvas → add Decision</li>
+          <li>Double-click canvas to add Decision</li>
           <li>Delete key removes selection</li>
           <li>Chance branches must sum to 100%</li>
         </ul>

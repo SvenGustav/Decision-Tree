@@ -7,19 +7,57 @@ html, body, #root {
   margin: 0;
   padding: 0;
   overflow: hidden;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
-  background: #f8fafc;
+  font-family: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  background: #f1f5f9;
+}
+
+.react-flow {
+  --xy-edge-stroke: #94a3b8;
+  --xy-edge-stroke-width: 1.5;
+  --xy-handle-background: #1d4ed8;
+  --xy-handle-border-color: #bfdbfe;
 }
 
 .react-flow__node {
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
 }
 
 .react-flow__edge-path {
-  stroke-width: 2;
+  stroke-width: 1.5;
+  transition: stroke 0.2s, stroke-width 0.2s;
 }
 
 .react-flow__edge.optimal .react-flow__edge-path {
-  stroke: #2563eb;
-  stroke-width: 3;
+  stroke: #1d4ed8;
+  stroke-width: 2.5;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: #d97706;
+  stroke-width: 2.5;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Selection styling */
+::selection {
+  background: rgba(29,78,216,0.15);
+  color: #1e3a8a;
 }
